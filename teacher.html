@@ -126,10 +126,11 @@
                     <table class="w-full text-xs">
                         <thead class="bg-gray-950 sticky top-0">
                             <tr>
-                                <th class="text-left px-3 py-2 text-gray-500 font-mono">#</th>
-                                <th class="text-left px-3 py-2 text-gray-500 font-mono">รหัส</th>
-                                <th class="text-left px-3 py-2 text-gray-500 font-mono">ชื่อ</th>
-                                <th class="text-right px-3 py-2 text-gray-500 font-mono">ระยะ</th>
+                                <th class="text-left px-3 py-2 text-gray-500 font-mono text-xs">#</th>
+                                <th class="text-left px-3 py-2 text-gray-500 font-mono text-xs">รหัส</th>
+                                <th class="text-left px-3 py-2 text-gray-500 font-mono text-xs">ชื่อ</th>
+                                <th class="text-left px-3 py-2 text-gray-500 font-mono text-xs">เวลา</th>
+                                <th class="text-right px-3 py-2 text-gray-500 font-mono text-xs">ระยะ</th>
                             </tr>
                         </thead>
                         <tbody id="attendance-tbody"></tbody>
@@ -263,23 +264,52 @@
             }
         }
 
+        // ---- Normalize helpers (เหมือน dashboard) ----
+        function normDate(val) {
+            if (!val) return "";
+            if (val instanceof Date) return val.toISOString().split("T")[0];
+            const s = String(val).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+                const [d, m, y] = s.split("/");
+                return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
+            }
+            const p = new Date(s);
+            return isNaN(p) ? s : p.toISOString().split("T")[0];
+        }
+
+        function extractTime(val) {
+            if (!val) return "—";
+            const m = String(val).match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+            return m ? m[1].padStart(2,"0") + ":" + m[2] + " น." : "—";
+        }
+
         // ---- Polling attendance ----
         async function fetchAttendance() {
             try {
                 const res  = await fetch(APPS_SCRIPT_URL + '?t=' + Date.now());
                 const json = await res.json();
                 if (json.status !== "ok") return;
-                const filtered = json.data.filter(r => r.subject === currentSubject && r.date === currentDate);
+
+                // normalize date ทุกแถวก่อน filter
+                const filtered = json.data
+                    .map(r => ({ ...r, date: normDate(r.date) }))
+                    .filter(r => r.subject === currentSubject && r.date === currentDate);
+
+                // อัปเดตตัวนับ
                 document.getElementById('live-count').innerText = filtered.length;
-                const now = new Date().toTimeString().substring(0, 8);
-                document.getElementById('last-refresh').innerText = "อัปเดต: " + now;
+                document.getElementById('last-refresh').innerText =
+                    "อัปเดต: " + new Date().toTimeString().substring(0, 8);
+
+                // แสดงตาราง
                 if (filtered.length > 0) {
                     document.getElementById('attendance-table-wrap').style.display = 'block';
                     document.getElementById('attendance-tbody').innerHTML = filtered.map((r, i) => `
                         <tr class="border-t border-gray-800 hover:bg-gray-800/50">
                             <td class="px-3 py-2 text-gray-500">${i+1}</td>
-                            <td class="px-3 py-2 font-mono text-gray-300">${r.studentId || '—'}</td>
+                            <td class="px-3 py-2 font-mono text-gray-300 text-xs">${r.studentId || '—'}</td>
                             <td class="px-3 py-2 text-white">${r.studentName || '—'}</td>
+                            <td class="px-3 py-2 text-gray-400 text-xs font-mono">${extractTime(r.timestamp)}</td>
                             <td class="px-3 py-2 text-cyan-400 text-right font-mono">${r.distance || '—'}ม.</td>
                         </tr>`).join('');
                 }
@@ -290,10 +320,10 @@
 
         function startPolling(subject, date) {
             currentSubject = subject;
-            currentDate = date;
-            fetchAttendance();
+            currentDate    = date;
+            fetchAttendance(); // ดึงทันที
             if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(fetchAttendance, 15000);
+            pollInterval = setInterval(fetchAttendance, 5000); // ทุก 5 วิ
         }
 
         function stopPolling() {

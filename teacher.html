@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเช็คชื่อสำหรับอาจารย์</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chakrapetch:wght@300;500;700&display=swap');
+        body { font-family: 'Chakrapetch', sans-serif; }
+        #radius-map { border-radius: 12px; overflow: hidden; border: 1px solid #1f2937; }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen p-4 md:p-8 flex flex-col justify-between">
+
+    <header class="text-center mb-6">
+        <h1 class="text-3xl md:text-4xl font-black text-cyan-400 tracking-wider">ALL-IN-ONE TEACHER DASHBOARD</h1>
+        <p class="text-xs text-gray-500 font-mono">MANAGEMENT NODE // BY J.A.R.V.I.S.</p>
+    </header>
+
+    <main class="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-6 items-start flex-grow">
+
+        <section class="bg-gray-900 border border-gray-800 p-6 rounded-2xl shadow-xl flex flex-col gap-4">
+            <h2 class="text-lg font-bold text-cyan-400 border-b border-gray-800 pb-2">📋 1. ตั้งค่าและเปิดระบบเช็คชื่อ</h2>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">ชื่อรายวิชา</label>
+                <input type="text" id="subject-name" value="CPE-101 Anti-Cheat Programming"
+                    class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">วันที่สอน</label>
+                    <input type="date" id="setup-date" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">เวลาเริ่มคาบ</label>
+                    <input type="time" id="setup-time" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-white text-sm">
+                </div>
+            </div>
+
+            <div class="bg-gray-950 p-4 rounded-xl border border-gray-800">
+                <span class="block text-xs font-semibold text-gray-400 uppercase mb-2">พิกัดอ้างอิงห้องเรียน</span>
+                <button onclick="pinClassroom()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition">
+                    📍 กดปักหมุด ณ ห้องเรียนตอนนี้
+                </button>
+                <div class="text-[11px] text-gray-500 mt-2 font-mono text-center" id="classroom-coords">
+                    สถานะ: ยังไม่ได้ล็อกพิกัดห้องเรียน
+                </div>
+            </div>
+
+            <div class="bg-gray-950 p-4 rounded-xl border border-gray-800">
+                <span class="text-xs font-semibold text-gray-400 uppercase block mb-3">รัศมีห้องเรียน (ระยะสูงสุดที่ยอมรับ)</span>
+                <div class="flex items-center gap-3 mb-2">
+                    <input type="number" id="radius-input" min="0.01" max="5" step="0.05" value="0.10"
+                        class="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm font-mono text-center focus:outline-none focus:border-cyan-500"
+                        oninput="syncFromInput()">
+                    <span class="text-gray-400 text-sm shrink-0">กม.</span>
+                    <input type="range" id="radius-slider" min="0.01" max="5" step="0.05" value="0.10"
+                        class="flex-1 accent-cyan-500 cursor-pointer"
+                        oninput="syncFromSlider()">
+                </div>
+                <div class="flex justify-between text-[10px] text-gray-600 font-mono mb-3">
+                    <span>0.01 กม.</span>
+                    <span id="radius-meters" class="text-cyan-500/70">= 100 เมตร</span>
+                    <span>5.00 กม.</span>
+                </div>
+
+                <div id="map-placeholder" class="flex items-center justify-center rounded-xl border border-gray-800 text-gray-600 text-xs font-mono" style="height:220px">
+                    📍 กดปักหมุดพิกัดห้องเรียนก่อนเพื่อดูแผนที่
+                </div>
+                <div id="radius-map" style="height:220px; display:none;"></div>
+            </div>
+
+            <button id="btn-toggle" onclick="toggleSystem()"
+                class="w-full bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-4 px-6 rounded-xl text-lg uppercase tracking-wider transition-all shadow-lg mt-2">
+                🟢 เริ่มเปิดระบบเช็คชื่อ
+            </button>
+            <button onclick="exportToExcel()"
+                class="w-full bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-cyan-500/30 font-bold py-2.5 px-6 rounded-xl text-sm uppercase transition-all">
+                📥 ส่งออกข้อมูลเป็น EXCEL
+            </button>
+        </section>
+
+        <section class="bg-gray-900 border border-gray-800 p-6 rounded-2xl shadow-xl flex flex-col items-center justify-center min-h-[440px]">
+            <h2 class="text-lg font-bold text-cyan-400 border-b border-gray-800 pb-2 w-full text-center mb-4">📺 2. QR CODE หน้าห้องเรียน</h2>
+
+            <div class="text-center mb-4">
+                <span class="text-xs uppercase tracking-widest text-gray-400 block mb-1">จำนวนข้อมูลที่บันทึกชั่วคราวบนเครื่องนี้</span>
+                <div class="text-5xl font-black text-emerald-400"><span id="live-count">0</span><span class="text-xl text-gray-600"> แถว</span></div>
+                <p class="text-[11px] text-gray-500 mt-1">*(เนื่องจากไม่มีเซิร์ฟเวอร์หลังบ้าน รายชื่อจะเซฟลงสเปรดชีตของเด็กแล้วอาจารย์ค่อยรวบรวม หรือส่งออกผ่านเครื่องเด็กได้ครับ)*</p>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-inner mb-4 flex flex-col items-center">
+                <img id="qr-display" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=WAITING" class="w-48 h-48 opacity-30">
+            </div>
+
+            <button id="btn-zoom" onclick="openZoom()" class="hidden bg-gray-800 hover:bg-gray-700 text-xs px-4 py-2 rounded-lg border border-gray-700 text-gray-300 transition-all">
+                🔍 ขยาย QR Code เต็มหน้าจอ
+            </button>
+            <p class="text-xs text-center text-gray-500 mt-2" id="system-status-msg">กรุณาปักหมุดและกดเปิดระบบเพื่อสร้างรหัส QR</p>
+        </section>
+    </main>
+
+    <div id="zoom-modal" class="hidden fixed inset-0 bg-gray-950/95 flex flex-col items-center justify-center p-4 z-[1000]">
+        <button onclick="closeZoom()" class="absolute top-6 right-6 text-gray-400 hover:text-white text-4xl font-bold">&times;</button>
+        <h2 class="text-2xl md:text-3xl font-bold text-cyan-400 mb-2 text-center" id="zoom-subject">วิชา</h2>
+        <p class="text-gray-400 mb-6 text-sm md:text-base text-center">ให้นักศึกษายกมือถือขึ้นมาสแกนเพื่อเข้าสู่หน้าเช็คชื่อจริง</p>
+        <div class="bg-white p-6 rounded-3xl shadow-2xl">
+            <img id="qr-zoom-display" src="" class="w-72 h-72 md:w-[450px] md:h-[450px]">
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('setup-date').valueAsDate = new Date();
+        document.getElementById('setup-time').value = new Date().toTimeString().substring(0, 5);
+
+        let classroomLocation = null;
+        let isSystemOpen = false;
+        let leafletMap = null;
+        let leafletCircle = null;
+
+        function getRadiusMeters() {
+            const km = parseFloat(document.getElementById('radius-input').value) || 0.1;
+            return Math.round(Math.min(5, Math.max(0.01, km)) * 1000);
+        }
+
+        function syncFromSlider() {
+            const val = parseFloat(document.getElementById('radius-slider').value);
+            document.getElementById('radius-input').value = val.toFixed(2);
+            document.getElementById('radius-meters').innerText = '= ' + Math.round(val * 1000) + ' เมตร';
+            updateCircle();
+        }
+
+        function syncFromInput() {
+            let val = parseFloat(document.getElementById('radius-input').value);
+            if (isNaN(val)) return;
+            val = Math.min(5, Math.max(0.01, val));
+            document.getElementById('radius-slider').value = val;
+            document.getElementById('radius-meters').innerText = '= ' + Math.round(val * 1000) + ' เมตร';
+            updateCircle();
+        }
+
+        function updateCircle() {
+            if (!leafletMap || !leafletCircle) return;
+            const meters = getRadiusMeters();
+            leafletCircle.setRadius(meters);
+            leafletMap.fitBounds(leafletCircle.getBounds(), { padding: [24, 24] });
+        }
+
+        function initMap(lat, lon) {
+            document.getElementById('map-placeholder').style.display = 'none';
+            const mapEl = document.getElementById('radius-map');
+            mapEl.style.display = 'block';
+
+            if (leafletMap) {
+                leafletMap.remove();
+                leafletMap = null;
+                leafletCircle = null;
+            }
+
+            leafletMap = L.map('radius-map', { zoomControl: true, attributionControl: false })
+                         .setView([lat, lon], 16);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
+             .addTo(leafletMap);
+
+            const pinIcon = L.divIcon({
+                html: '<div style="width:14px;height:14px;background:#06b6d4;border:3px solid white;border-radius:50%;box-shadow:0 0 8px rgba(6,182,212,0.8)"></div>',
+                iconSize: [14, 14], iconAnchor: [7, 7], className: ''
+            });
+            L.marker([lat, lon], { icon: pinIcon }).addTo(leafletMap);
+
+            leafletCircle = L.circle([lat, lon], {
+                radius: getRadiusMeters(),
+                color: '#06b6d4',
+                fillColor: '#06b6d4',
+                fillOpacity: 0.15,
+                weight: 2,
+                dashArray: '6 4'
+            }).addTo(leafletMap);
+
+            leafletMap.fitBounds(leafletCircle.getBounds(), { padding: [24, 24] });
+        }
+
+        function pinClassroom() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    classroomLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
+                    document.getElementById('classroom-coords').innerText =
+                        'ล็อกตำแหน่งแล้ว! Lat: ' + classroomLocation.lat.toFixed(5) + ' | Lon: ' + classroomLocation.lon.toFixed(5);
+                    document.getElementById('classroom-coords').className = "text-[11px] text-emerald-400 mt-2 font-mono text-center";
+                    initMap(classroomLocation.lat, classroomLocation.lon);
+                }, function() {
+                    alert("กรุณาเปิด GPS บนอุปกรณ์ก่อนครับ");
+                }, { enableHighAccuracy: true });
+            }
+        }
+
+        function toggleSystem() {
+            if (!classroomLocation) { alert("อาจารย์ลืมกดปุ่ม 'ปักหมุดพิกัดห้องเรียน' ครับ!"); return; }
+            const btn = document.getElementById('btn-toggle');
+            const qrImg = document.getElementById('qr-display');
+            const btnZoom = document.getElementById('btn-zoom');
+            isSystemOpen = !isSystemOpen;
+
+            if (isSystemOpen) {
+                btn.innerText = "🔴 ปิดระบบเช็คชื่อ";
+                btn.className = "w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-xl text-lg uppercase tracking-wider transition-all shadow-lg mt-2";
+
+                const subject = document.getElementById('subject-name').value;
+                const date = document.getElementById('setup-date').value;
+                const time = document.getElementById('setup-time').value;
+                const radiusMeters = getRadiusMeters();
+                const token = Math.random().toString(36).substring(7).toUpperCase();
+
+                const baseUrl = window.location.href.split('teacher.html')[0];
+                const studentUrl = baseUrl + 'student.html?token=' + token +
+                    '&sub=' + encodeURIComponent(subject) +
+                    '&date=' + date + '&time=' + time +
+                    '&tlat=' + classroomLocation.lat + '&tlon=' + classroomLocation.lon +
+                    '&radius=' + radiusMeters;
+
+                qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(studentUrl);
+                qrImg.classList.remove('opacity-30');
+                btnZoom.classList.remove('hidden');
+                document.getElementById('system-status-msg').innerText = "ระบบสร้างรหัสเช็คชื่อและฝังพิกัดลง QR Code สำเร็จ!";
+            } else {
+                btn.innerText = "🟢 เริ่มเปิดระบบเช็คชื่อ";
+                btn.className = "w-full bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-4 px-6 rounded-xl text-lg uppercase tracking-wider transition-all shadow-lg mt-2";
+                qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=CLOSED";
+                qrImg.classList.add('opacity-30');
+                btnZoom.classList.add('hidden');
+                closeZoom();
+                document.getElementById('system-status-msg').innerText = "ระบบปิดการเช็คชื่อเรียบร้อยแล้ว";
+            }
+        }
+
+        function openZoom() {
+            document.getElementById('zoom-subject').innerText = document.getElementById('subject-name').value;
+            document.getElementById('qr-zoom-display').src = document.getElementById('qr-display').src;
+            document.getElementById('zoom-modal').classList.remove('hidden');
+            // ซ่อน map ไม่ให้ซ้อนทับ modal (Leaflet tiles มี z-index สูง)
+            const mapEl = document.getElementById('radius-map');
+            if (mapEl) mapEl.style.visibility = 'hidden';
+        }
+
+        function closeZoom() {
+            document.getElementById('zoom-modal').classList.add('hidden');
+            // คืน map กลับมา
+            const mapEl = document.getElementById('radius-map');
+            if (mapEl) mapEl.style.visibility = 'visible';
+        }
+
+        function exportToExcel() {
+            const db = JSON.parse(localStorage.getItem('local_teacher_db')) || [];
+            if (db.length === 0) {
+                alert("หากใช้งานแบบไม่มีเซิร์ฟเวอร์หลังบ้าน รายชื่อจะถูกส่งไปบันทึกที่คลาวด์/ชีทของเด็กโดยตรง หรือเจ้านายต้องนำโค้ดไปต่อฐานข้อมูลครับ");
+                return;
+            }
+            const worksheet = XLSX.utils.json_to_sheet(db);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "สรุป");
+            XLSX.writeFile(workbook, "attendance.xlsx");
+        }
+    </script>
+</body>
+</html>

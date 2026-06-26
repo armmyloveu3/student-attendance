@@ -5,23 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - ระบบเช็คชื่อ</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Chakrapetch:wght@300;500;700&display=swap');
         body { font-family: 'Chakrapetch', sans-serif; }
         .pulse { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
     </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen p-4 md:p-8">
 
-    <header class="flex items-center justify-between mb-6">
+    <header class="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
             <h1 class="text-2xl md:text-3xl font-black text-cyan-400 tracking-wider">ATTENDANCE DASHBOARD</h1>
             <p class="text-xs text-gray-500 font-mono mt-1">LIVE MONITOR // BY J.A.R.V.I.S.</p>
         </div>
         <div class="flex items-center gap-3">
-            <span id="status-dot" class="w-2 h-2 rounded-full bg-emerald-400 pulse"></span>
+            <span id="status-dot" class="w-2 h-2 rounded-full bg-yellow-400 pulse"></span>
             <span id="last-refresh-text" class="text-xs text-gray-500 font-mono">กำลังเชื่อมต่อ...</span>
+            <button onclick="fetchData()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-lg transition">🔄</button>
         </div>
     </header>
 
@@ -30,18 +32,27 @@
         <div>
             <label class="block text-xs text-gray-500 font-mono uppercase mb-1">วิชา</label>
             <select id="filter-subject" onchange="applyFilter()"
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500 min-w-[200px]">
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500 min-w-[180px]">
+                <option value="">— ทั้งหมด —</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 font-mono uppercase mb-1">ผู้สอน</label>
+            <select id="filter-teacher" onchange="applyFilter()"
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500 min-w-[160px]">
                 <option value="">— ทั้งหมด —</option>
             </select>
         </div>
         <div>
             <label class="block text-xs text-gray-500 font-mono uppercase mb-1">วันที่</label>
-            <input type="date" id="filter-date" onchange="applyFilter()"
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500">
+            <select id="filter-date" onchange="applyFilter()"
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500 min-w-[160px]">
+                <option value="">— ทั้งหมด —</option>
+            </select>
         </div>
-        <button onclick="fetchData()"
-            class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-sm px-4 py-2 rounded-lg transition">
-            🔄 รีเฟรช
+        <button onclick="resetFilters()"
+            class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 text-sm px-4 py-2 rounded-lg transition">
+            ✖ ล้าง filter
         </button>
         <button onclick="exportExcel()"
             class="bg-gray-800 hover:bg-gray-700 border border-cyan-500/30 text-cyan-400 text-sm px-4 py-2 rounded-lg transition ml-auto">
@@ -56,17 +67,18 @@
             <p class="text-4xl font-black text-cyan-400" id="metric-total">—</p>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-            <p class="text-xs text-gray-500 uppercase font-mono mb-1">ผ่าน GPS</p>
-            <p class="text-4xl font-black text-emerald-400" id="metric-pass">—</p>
-        </div>
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4">
             <p class="text-xs text-gray-500 uppercase font-mono mb-1">ระยะเฉลี่ย</p>
             <p class="text-4xl font-black text-white" id="metric-avg">—</p>
             <p class="text-xs text-gray-600 font-mono">เมตร</p>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+            <p class="text-xs text-gray-500 uppercase font-mono mb-1">ใกล้สุด</p>
+            <p class="text-4xl font-black text-emerald-400" id="metric-min">—</p>
+            <p class="text-xs text-gray-600 font-mono">เมตร</p>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4">
             <p class="text-xs text-gray-500 uppercase font-mono mb-1">คนล่าสุด</p>
-            <p class="text-lg font-bold text-purple-400 truncate" id="metric-latest">—</p>
+            <p class="text-base font-bold text-purple-400 truncate" id="metric-latest">—</p>
         </div>
     </div>
 
@@ -81,20 +93,20 @@
             ⏳ กำลังโหลดข้อมูลจาก Google Sheets...
         </div>
         <div id="empty-state" class="hidden text-center py-16 text-gray-600 font-mono text-sm">
-            📭 ยังไม่มีข้อมูลในวันที่/วิชาที่เลือก
+            📭 ยังไม่มีข้อมูลตาม filter ที่เลือก
         </div>
-
         <div class="overflow-x-auto" id="table-wrap" style="display:none">
             <table class="w-full text-sm">
                 <thead class="bg-gray-950">
                     <tr>
-                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs uppercase">#</th>
-                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs uppercase">รหัส นศ.</th>
-                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs uppercase">ชื่อ - นามสกุล</th>
-                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs uppercase">วิชา</th>
-                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs uppercase">ผู้สอน</th>
-                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs uppercase">เวลา</th>
-                        <th class="text-right px-4 py-3 text-gray-500 font-mono text-xs uppercase">ระยะ (ม.)</th>
+                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">#</th>
+                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">รหัส นศ.</th>
+                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">ชื่อ - นามสกุล</th>
+                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">วิชา</th>
+                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">ผู้สอน</th>
+                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">วันที่</th>
+                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">เวลา</th>
+                        <th class="text-right px-4 py-3 text-gray-500 font-mono text-xs">ระยะ (ม.)</th>
                     </tr>
                 </thead>
                 <tbody id="main-tbody"></tbody>
@@ -102,74 +114,152 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwVi-NZy6VTxr-tWw-oO4Kb9U0TeSa1XDMwsVqppGjGwPaidsZXGF_IXTTwMF87CTkn/exec";
 
         let allData = [];
-        let pollTimer = null;
 
-        // set default date = today
-        document.getElementById('filter-date').valueAsDate = new Date();
+        // แปลง date ให้เป็น string YYYY-MM-DD เสมอ ไม่ว่า Sheets จะส่งมาเป็น format อะไร
+        function normalizeDate(val) {
+            if (!val) return "";
+            // ถ้าเป็น Date object หรือ timestamp
+            if (val instanceof Date) {
+                return val.toISOString().split("T")[0];
+            }
+            const s = String(val).trim();
+            // YYYY-MM-DD อยู่แล้ว
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+            // DD/MM/YYYY หรือ D/M/YYYY
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+                const [d, m, y] = s.split("/");
+                return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+            }
+            // พยายาม parse ด้วย Date
+            const parsed = new Date(s);
+            if (!isNaN(parsed)) return parsed.toISOString().split("T")[0];
+            return s;
+        }
+
+        // แปลง timestamp ให้ได้แค่เวลา HH:MM:SS
+        function normalizeTime(val) {
+            if (!val) return "—";
+            const s = String(val).trim();
+            // จับ pattern เวลา HH:MM หรือ HH:MM:SS
+            const match = s.match(/\d{1,2}:\d{2}(?::\d{2})?/);
+            return match ? match[0] : s;
+        }
+
+        // แปลงวันที่เป็นภาษาไทย
+        function formatDateTH(dateStr) {
+            if (!dateStr) return "—";
+            try {
+                const d = new Date(dateStr + "T00:00:00");
+                return d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
+            } catch { return dateStr; }
+        }
 
         async function fetchData() {
             document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-yellow-400 pulse";
             try {
-                const res  = await fetch(APPS_SCRIPT_URL + '?t=' + Date.now());
+                const res  = await fetch(APPS_SCRIPT_URL + "?t=" + Date.now());
                 const json = await res.json();
-                if (json.status !== "ok") throw new Error(json.message);
+                if (json.status !== "ok") throw new Error(json.message || "error");
 
-                allData = json.data || [];
+                // normalize date ทุกแถว
+                allData = (json.data || []).map(r => ({
+                    ...r,
+                    date: normalizeDate(r.date)
+                }));
 
-                // populate subject filter
-                const subjects = [...new Set(allData.map(r => r.subject).filter(Boolean))];
-                const sel = document.getElementById('filter-subject');
-                const cur = sel.value;
-                sel.innerHTML = '<option value="">— ทั้งหมด —</option>' +
-                    subjects.map(s => `<option value="${s}" ${s===cur?'selected':''}>${s}</option>`).join('');
-
+                populateFilters();
                 applyFilter();
-                const now = new Date().toTimeString().substring(0,8);
+
+                const now = new Date().toTimeString().substring(0, 8);
                 document.getElementById('last-refresh-text').innerText = "อัปเดต: " + now;
                 document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-emerald-400 pulse";
             } catch(err) {
                 document.getElementById('last-refresh-text').innerText = "เชื่อมต่อไม่ได้: " + err.message;
                 document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-red-500";
+                document.getElementById('loading-state').innerText = "❌ " + err.message;
+            }
+        }
+
+        function populateFilters() {
+            const curSubject = document.getElementById('filter-subject').value;
+            const curTeacher = document.getElementById('filter-teacher').value;
+            const curDate    = document.getElementById('filter-date').value;
+
+            const subjects = [...new Set(allData.map(r => r.subject).filter(Boolean))].sort();
+            const teachers = [...new Set(allData.map(r => r.teacher).filter(Boolean))].sort();
+            // วันที่เรียงล่าสุดก่อน
+            const dates    = [...new Set(allData.map(r => r.date).filter(Boolean))].sort().reverse();
+
+            document.getElementById('filter-subject').innerHTML =
+                '<option value="">— ทั้งหมด —</option>' +
+                subjects.map(s => `<option value="${s}" ${s===curSubject?'selected':''}>${s}</option>`).join('');
+
+            document.getElementById('filter-teacher').innerHTML =
+                '<option value="">— ทั้งหมด —</option>' +
+                teachers.map(t => `<option value="${t}" ${t===curTeacher?'selected':''}>${t}</option>`).join('');
+
+            document.getElementById('filter-date').innerHTML =
+                '<option value="">— ทั้งหมด —</option>' +
+                dates.map(d => `<option value="${d}" ${d===curDate?'selected':''}>${formatDateTH(d)} (${d})</option>`).join('');
+
+            // ถ้ายังไม่เคยเลือก default เป็นวันนี้ถ้ามี
+            if (!curDate) {
+                const today = new Date().toISOString().split("T")[0];
+                if (dates.includes(today)) {
+                    document.getElementById('filter-date').value = today;
+                }
             }
         }
 
         function applyFilter() {
-            const subjectFilter = document.getElementById('filter-subject').value;
-            const dateFilter    = document.getElementById('filter-date').value;
+            const sf = document.getElementById('filter-subject').value;
+            const tf = document.getElementById('filter-teacher').value;
+            const df = document.getElementById('filter-date').value;
 
             let filtered = allData;
-            if (subjectFilter) filtered = filtered.filter(r => r.subject === subjectFilter);
-            if (dateFilter)    filtered = filtered.filter(r => r.date === dateFilter);
+            if (sf) filtered = filtered.filter(r => r.subject === sf);
+            if (tf) filtered = filtered.filter(r => r.teacher === tf);
+            if (df) filtered = filtered.filter(r => r.date === df);
 
-            renderTable(filtered);
             renderMetrics(filtered);
+            renderTable(filtered);
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-subject').value = '';
+            document.getElementById('filter-teacher').value = '';
+            document.getElementById('filter-date').value = '';
+            applyFilter();
         }
 
         function renderMetrics(data) {
             document.getElementById('metric-total').innerText = data.length || "0";
-            document.getElementById('metric-pass').innerText  = data.length || "0";
-            const avg = data.length
-                ? Math.round(data.reduce((s,r) => s + (parseInt(r.distance)||0), 0) / data.length)
-                : "—";
-            document.getElementById('metric-avg').innerText    = avg;
-            document.getElementById('metric-latest').innerText = data.length ? data[data.length-1].studentName : "—";
+            if (data.length) {
+                const distances = data.map(r => parseInt(r.distance) || 0).filter(d => d > 0);
+                const avg = distances.length ? Math.round(distances.reduce((a,b)=>a+b,0)/distances.length) : "—";
+                const min = distances.length ? Math.min(...distances) : "—";
+                document.getElementById('metric-avg').innerText    = avg;
+                document.getElementById('metric-min').innerText    = min;
+                document.getElementById('metric-latest').innerText = data[data.length-1].studentName || "—";
+            } else {
+                document.getElementById('metric-avg').innerText    = "—";
+                document.getElementById('metric-min').innerText    = "—";
+                document.getElementById('metric-latest').innerText = "—";
+            }
         }
 
         function renderTable(data) {
             document.getElementById('loading-state').classList.add('hidden');
-
             if (data.length === 0) {
                 document.getElementById('table-wrap').style.display = 'none';
                 document.getElementById('empty-state').classList.remove('hidden');
                 document.getElementById('table-count').innerText = "";
                 return;
             }
-
             document.getElementById('empty-state').classList.add('hidden');
             document.getElementById('table-wrap').style.display = 'block';
             document.getElementById('table-count').innerText = data.length + " รายการ";
@@ -177,42 +267,45 @@
             document.getElementById('main-tbody').innerHTML = data.map((r, i) => `
                 <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition">
                     <td class="px-4 py-3 text-gray-600">${i+1}</td>
-                    <td class="px-4 py-3 font-mono text-gray-300">${r.studentId || "—"}</td>
+                    <td class="px-4 py-3 font-mono text-gray-300 text-xs">${r.studentId || "—"}</td>
                     <td class="px-4 py-3 font-bold text-white">${r.studentName || "—"}</td>
                     <td class="px-4 py-3 text-gray-400 text-xs">${r.subject || "—"}</td>
                     <td class="px-4 py-3 text-purple-400 text-xs">${r.teacher || "—"}</td>
-                    <td class="px-4 py-3 text-gray-400 font-mono text-xs">${String(r.timestamp).split(" ")[1] || r.timestamp || "—"}</td>
+                    <td class="px-4 py-3 text-gray-400 text-xs font-mono">${formatDateTH(r.date)}</td>
+                    <td class="px-4 py-3 text-gray-400 text-xs font-mono">${normalizeTime(r.timestamp)}</td>
                     <td class="px-4 py-3 text-right text-cyan-400 font-mono">${r.distance || "—"}</td>
                 </tr>`).join('');
         }
 
         function exportExcel() {
-            const subjectFilter = document.getElementById('filter-subject').value;
-            const dateFilter    = document.getElementById('filter-date').value;
+            const sf = document.getElementById('filter-subject').value;
+            const tf = document.getElementById('filter-teacher').value;
+            const df = document.getElementById('filter-date').value;
             let filtered = allData;
-            if (subjectFilter) filtered = filtered.filter(r => r.subject === subjectFilter);
-            if (dateFilter)    filtered = filtered.filter(r => r.date === dateFilter);
+            if (sf) filtered = filtered.filter(r => r.subject === sf);
+            if (tf) filtered = filtered.filter(r => r.teacher === tf);
+            if (df) filtered = filtered.filter(r => r.date === df);
             if (!filtered.length) { alert("ไม่มีข้อมูลที่จะส่งออก"); return; }
 
-            const rows = filtered.map((r,i) => ({
-                ลำดับ: i+1,
+            const rows = filtered.map((r, i) => ({
+                ลำดับ:        i + 1,
                 รหัสนักศึกษา: r.studentId,
                 ชื่อนามสกุล:  r.studentName,
                 วิชา:          r.subject,
                 ผู้สอน:        r.teacher || "—",
                 วันที่:         r.date,
-                เวลา:          String(r.timestamp).split(" ")[1] || r.timestamp,
+                เวลา:          normalizeTime(r.timestamp),
                 ระยะเมตร:      r.distance
             }));
             const ws = XLSX.utils.json_to_sheet(rows);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "เช็คชื่อ");
-            XLSX.writeFile(wb, "attendance_" + (dateFilter||"all") + ".xlsx");
+            XLSX.writeFile(wb, "attendance_" + (df || "all") + ".xlsx");
         }
 
-        // โหลดครั้งแรก และ poll ทุก 15 วิ
+        // โหลดครั้งแรก + poll ทุก 15 วิ
         fetchData();
-        pollTimer = setInterval(fetchData, 15000);
+        setInterval(fetchData, 15000);
     </script>
 </body>
 </html>

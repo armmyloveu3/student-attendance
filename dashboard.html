@@ -18,7 +18,7 @@
     <header class="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
             <h1 class="text-2xl md:text-3xl font-black text-cyan-400 tracking-wider">ATTENDANCE DASHBOARD</h1>
-            <p class="text-xs text-gray-500 font-mono mt-1">LIVE MONITOR // BY Nong ArmNarak</p>
+            <p class="text-xs text-gray-500 font-mono mt-1">LIVE MONITOR // BY J.A.R.V.I.S.</p>
         </div>
         <div class="flex items-center gap-3">
             <span id="status-dot" class="w-2 h-2 rounded-full bg-yellow-400 pulse"></span>
@@ -109,15 +109,13 @@
 
         function normalizeDate(val) {
             if (!val) return "";
-            if (val instanceof Date) return val.toISOString().split("T")[0];
             const s = String(val).trim();
-            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-                const [d, m, y] = s.split("/");
-                return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+            const thMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (thMatch) {
+                const [, d, m, y] = thMatch;
+                return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
             }
-            const parsed = new Date(s);
-            if (!isNaN(parsed)) return parsed.toISOString().split("T")[0];
             return s;
         }
 
@@ -125,17 +123,19 @@
         function extractTime(val) {
             if (!val) return "—";
             const s = String(val).trim();
-            // รูปแบบไทย: "26/6/2568 09:30:00" หรือ "2025-06-26 09:30:00"
             const m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
-            if (m) return m[1].padStart(2,"0") + ":" + m[2] + " น.";
-            return "—";
+            if (!m) return "—";
+            return m[1].padStart(2, "0") + ":" + m[2] + " น.";
         }
 
         function formatDateTH(dateStr) {
             if (!dateStr) return "—";
             try {
-                const d = new Date(dateStr + "T00:00:00");
-                return d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
+                const [y, m, d] = dateStr.split("-").map(Number);
+                const months = ["","ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
+                                "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+                const buddhistYear = (y + 543).toString().slice(-2);
+                return d + " " + (months[m] || m) + " " + buddhistYear;
             } catch { return dateStr; }
         }
 

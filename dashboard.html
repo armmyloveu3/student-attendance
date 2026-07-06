@@ -6,6 +6,7 @@
     <title>Dashboard - ระบบเช็คชื่อ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Chakrapetch:wght@300;500;700&display=swap');
         body { font-family: 'Chakrapetch', sans-serif; }
@@ -53,8 +54,11 @@
         <button onclick="resetFilters()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 text-sm px-4 py-2 rounded-lg transition">
             ✖ ล้าง filter
         </button>
-        <button onclick="exportExcel()" class="bg-gray-800 hover:bg-gray-700 border border-cyan-500/30 text-cyan-400 text-sm px-4 py-2 rounded-lg transition ml-auto">
-            📥 Export Excel
+        <button onclick="exportExcel('filtered')" class="bg-gray-800 hover:bg-gray-700 border border-cyan-500/30 text-cyan-400 text-sm px-4 py-2 rounded-lg transition">
+            📥 Export (ตาม filter)
+        </button>
+        <button onclick="exportExcel('session')" class="bg-gray-800 hover:bg-gray-700 border border-purple-500/30 text-purple-400 text-sm px-4 py-2 rounded-lg transition ml-auto">
+            📋 Export แยกรายคาบ
         </button>
     </div>
 
@@ -70,6 +74,21 @@
             <p class="text-xl font-bold text-purple-400 leading-tight" id="metric-latest">—</p>
             <p class="text-xs text-gray-600 font-mono mt-1" id="metric-latest-time">-</p>
         </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-bold text-cyan-400 uppercase font-mono">สถิติการเช็คชื่อ</h2>
+            <div class="flex gap-2">
+                <button onclick="setChartMode('hourly')" id="btn-hourly"
+                    class="text-xs px-3 py-1 rounded-lg border border-cyan-500/50 text-cyan-400 bg-cyan-500/10">รายชั่วโมง</button>
+                <button onclick="setChartMode('daily')" id="btn-daily"
+                    class="text-xs px-3 py-1 rounded-lg border border-gray-700 text-gray-500">รายวัน</button>
+            </div>
+        </div>
+        <canvas id="attendChart" height="80"></canvas>
+        <div id="chart-empty" class="hidden text-center py-8 text-gray-600 font-mono text-sm">ยังไม่มีข้อมูล</div>
     </div>
 
     <!-- Table -->
@@ -104,29 +123,48 @@
     </div>
 
     <script>
-        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwVi-NZy6VTxr-tWw-oO4Kb9U0TeSa1XDMwsVqppGjGwPaidsZXGF_IXTTwMF87CTkn/exec";
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxNHjhWhr6gnpDgLckTAebA9EPpGuSCh74g1NjmD0Xx07Nd-_qFPpfAoA9GYmZ0OnKL/exec";
         let allData = [];
 
         function normalizeDate(val) {
             if (!val) return "";
             const s = String(val).trim();
+            // ISO with timezone "2026-07-05T17:00:00.000Z" → บวก +7 ชม. แล้วตัดเอาวันที่
+            if (s.includes('T') && s.endsWith('Z')) {
+                const d = new Date(s);
+                const bkk = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+                return bkk.toISOString().substring(0, 10);
+            }
+            // "2026-07-06 09:06:53" หรือ "2026-07-06"
             if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+            // D/M/YYYY
             const thMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
             if (thMatch) {
                 const [, d, m, y] = thMatch;
                 return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
             }
             return s;
-        }
+        }}
 
         // แปลง timestamp จาก Apps Script ให้เป็นเวลา HH:MM น. เท่านั้น
         function extractTime(val) {
             if (!val) return "—";
             const s = String(val).trim();
+            // ISO UTC "2569-07-06T02:06:53.000Z" → บวก +7
+            if (s.includes('T') && s.endsWith('Z')) {
+                try {
+                    const d = new Date(s);
+                    const bkk = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+                    const h = String(bkk.getUTCHours()).padStart(2, '0');
+                    const m = String(bkk.getUTCMinutes()).padStart(2, '0');
+                    return h + ':' + m + ' น.';
+                } catch(e) {}
+            }
+            // "2026-07-06 09:06:53" → จับ HH:MM ตรงๆ
             const m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
             if (!m) return "—";
-            return m[1].padStart(2, "0") + ":" + m[2] + " น.";
-        }
+            return m[1].padStart(2, '0') + ':' + m[2] + ' น.';
+        }}
 
         function formatDateTH(dateStr) {
             if (!dateStr) return "—";
@@ -198,6 +236,7 @@
             if (df) filtered = filtered.filter(r => r.date === df);
             renderMetrics(filtered);
             renderTable(filtered);
+            renderChart(filtered);
         }
 
         function resetFilters() {
@@ -243,7 +282,8 @@
                 </tr>`).join('');
         }
 
-        function exportExcel() {
+        // ---- Export ----
+        function exportExcel(mode) {
             const sf = document.getElementById('filter-subject').value;
             const tf = document.getElementById('filter-teacher').value;
             const df = document.getElementById('filter-date').value;
@@ -252,15 +292,126 @@
             if (tf) filtered = filtered.filter(r => r.teacher === tf);
             if (df) filtered = filtered.filter(r => r.date === df);
             if (!filtered.length) { alert("ไม่มีข้อมูลที่จะส่งออก"); return; }
-            const rows = filtered.map((r, i) => ({
-                ลำดับ: i+1, รหัสนักศึกษา: r.studentId, ชื่อนามสกุล: r.studentName,
-                วิชา: r.subject, ผู้สอน: r.teacher || "—", วันที่: r.date,
-                เวลา: extractTime(r.timestamp), ระยะเมตร: r.distance
-            }));
-            const ws = XLSX.utils.json_to_sheet(rows);
+
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "เช็คชื่อ");
-            XLSX.writeFile(wb, "attendance_" + (df||"all") + ".xlsx");
+
+            if (mode === 'session') {
+                // export แยกรายคาบ (subject + date + teacher = 1 sheet)
+                const sessions = {};
+                filtered.forEach(r => {
+                    const key = (r.subject||'') + '_' + (r.date||'') + '_' + (r.teacher||'');
+                    if (!sessions[key]) sessions[key] = [];
+                    sessions[key].push(r);
+                });
+                Object.entries(sessions).forEach(([key, rows], si) => {
+                    const first = rows[0];
+                    const sheetName = ((first.subject||'วิชา') + ' ' + (first.date||'')).substring(0, 31);
+                    const data = rows.map((r, i) => ({
+                        ลำดับ: i+1, รหัสนักศึกษา: r.studentId, ชื่อนามสกุล: r.studentName,
+                        วิชา: r.subject, ผู้สอน: r.teacher||'—', วันที่: r.date,
+                        เวลา: extractTime(r.timestamp), ระยะเมตร: r.distance
+                    }));
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), sheetName);
+                });
+                XLSX.writeFile(wb, 'attendance_by_session.xlsx');
+            } else {
+                // export รวมตาม filter
+                const rows = filtered.map((r, i) => ({
+                    ลำดับ: i+1, รหัสนักศึกษา: r.studentId, ชื่อนามสกุล: r.studentName,
+                    วิชา: r.subject, ผู้สอน: r.teacher||'—', วันที่: r.date,
+                    เวลา: extractTime(r.timestamp), ระยะเมตร: r.distance
+                }));
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'เช็คชื่อ');
+                XLSX.writeFile(wb, 'attendance_' + (df||'all') + '.xlsx');
+            }
+        }
+
+        // ---- Chart ----
+        let chartInstance = null;
+        let chartMode = 'hourly';
+
+        function setChartMode(mode) {
+            chartMode = mode;
+            document.getElementById('btn-hourly').className = mode === 'hourly'
+                ? 'text-xs px-3 py-1 rounded-lg border border-cyan-500/50 text-cyan-400 bg-cyan-500/10'
+                : 'text-xs px-3 py-1 rounded-lg border border-gray-700 text-gray-500';
+            document.getElementById('btn-daily').className = mode === 'daily'
+                ? 'text-xs px-3 py-1 rounded-lg border border-cyan-500/50 text-cyan-400 bg-cyan-500/10'
+                : 'text-xs px-3 py-1 rounded-lg border border-gray-700 text-gray-500';
+
+            const sf = document.getElementById('filter-subject').value;
+            const tf = document.getElementById('filter-teacher').value;
+            const df = document.getElementById('filter-date').value;
+            let filtered = allData;
+            if (sf) filtered = filtered.filter(r => r.subject === sf);
+            if (tf) filtered = filtered.filter(r => r.teacher === tf);
+            if (df) filtered = filtered.filter(r => r.date === df);
+            renderChart(filtered);
+        }
+
+        function renderChart(data) {
+            const canvas = document.getElementById('attendChart');
+            const empty  = document.getElementById('chart-empty');
+
+            if (!data.length) {
+                canvas.style.display = 'none';
+                empty.classList.remove('hidden');
+                if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+                return;
+            }
+            canvas.style.display = 'block';
+            empty.classList.add('hidden');
+
+            let labels, counts;
+            if (chartMode === 'hourly') {
+                // นับตามชั่วโมง
+                const buckets = {};
+                data.forEach(r => {
+                    const t = extractTime(r.timestamp);
+                    const h = t.substring(0, 2) + ':00';
+                    buckets[h] = (buckets[h] || 0) + 1;
+                });
+                const sorted = Object.keys(buckets).sort();
+                labels = sorted.map(h => h + ' น.');
+                counts = sorted.map(h => buckets[h]);
+            } else {
+                // นับตามวัน
+                const buckets = {};
+                data.forEach(r => {
+                    const d = normalizeDate(r.date);
+                    buckets[d] = (buckets[d] || 0) + 1;
+                });
+                const sorted = Object.keys(buckets).sort();
+                labels = sorted.map(d => formatDateTH(d));
+                counts = sorted.map(d => buckets[d]);
+            }
+
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'จำนวนผู้เช็คชื่อ',
+                        data: counts,
+                        backgroundColor: 'rgba(6,182,212,0.5)',
+                        borderColor: 'rgba(6,182,212,1)',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' คน' } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af', font: { size: 11 } }, grid: { color: '#1f2937' } },
+                        y: { ticks: { color: '#9ca3af', stepSize: 1 }, grid: { color: '#1f2937' }, beginAtZero: true }
+                    }
+                }
+            });
         }
 
         fetchData();

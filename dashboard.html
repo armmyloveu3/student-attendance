@@ -136,13 +136,22 @@
         function normalizeDate(val) {
             if (!val) return "";
             const s = String(val).trim();
-            // ISO with timezone "2026-07-05T17:00:00.000Z" → บวก +7 ชม. แล้วตัดเอาวันที่
+            // "Fri Jul 10 2026 ..." → ใช้ Date parse แล้วบวก +7
+            if (s.startsWith('Fri') || s.startsWith('Mon') || s.startsWith('Tue') ||
+                s.startsWith('Wed') || s.startsWith('Thu') || s.startsWith('Sat') || s.startsWith('Sun')) {
+                try {
+                    const d = new Date(s);
+                    const bkk = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+                    return bkk.toISOString().substring(0, 10);
+                } catch(e) {}
+            }
+            // ISO UTC "2026-07-09T17:00:00.000Z"
             if (s.includes('T') && s.endsWith('Z')) {
                 const d = new Date(s);
                 const bkk = new Date(d.getTime() + 7 * 60 * 60 * 1000);
                 return bkk.toISOString().substring(0, 10);
             }
-            // "2026-07-06 09:06:53" หรือ "2026-07-06"
+            // "2026-07-10" หรือ "2026-07-10 10:04:24"
             if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
             // D/M/YYYY
             const thMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
@@ -151,27 +160,32 @@
                 return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
             }
             return s;
-        }
+        }}
 
         // แปลง timestamp จาก Apps Script ให้เป็นเวลา HH:MM น. เท่านั้น
         function extractTime(val) {
             if (!val) return "—";
             const s = String(val).trim();
-            // ISO UTC "2569-07-06T02:06:53.000Z" → บวก +7
+            // "Fri Jul 10 2026 10:04:24 GMT+0700" → มีเวลาอยู่แล้วใน local timezone
+            if (s.startsWith('Fri') || s.startsWith('Mon') || s.startsWith('Tue') ||
+                s.startsWith('Wed') || s.startsWith('Thu') || s.startsWith('Sat') || s.startsWith('Sun')) {
+                const m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+                if (m) return m[1].padStart(2,'0') + ':' + m[2] + ' น.';
+            }
+            // ISO UTC → บวก +7
             if (s.includes('T') && s.endsWith('Z')) {
                 try {
                     const d = new Date(s);
                     const bkk = new Date(d.getTime() + 7 * 60 * 60 * 1000);
-                    const h = String(bkk.getUTCHours()).padStart(2, '0');
-                    const m = String(bkk.getUTCMinutes()).padStart(2, '0');
-                    return h + ':' + m + ' น.';
+                    return String(bkk.getUTCHours()).padStart(2,'0') + ':' +
+                           String(bkk.getUTCMinutes()).padStart(2,'0') + ' น.';
                 } catch(e) {}
             }
-            // "2026-07-06 09:06:53" → จับ HH:MM ตรงๆ
+            // "2026-07-10 10:04:24"
             const m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
             if (!m) return "—";
-            return m[1].padStart(2, '0') + ':' + m[2] + ' น.';
-        }
+            return m[1].padStart(2,'0') + ':' + m[2] + ' น.';
+        }}
 
         function formatDateTH(dateStr) {
             if (!dateStr) return "—";

@@ -12,6 +12,10 @@
         @import url('https://fonts.googleapis.com/css2?family=Chakrapetch:wght@300;500;700&display=swap');
         body { font-family: 'Chakrapetch', sans-serif; }
         #radius-map { border-radius: 12px; overflow: hidden; border: 1px solid #1f2937; }
+        .pulse-new { animation: pulseNew 0.6s ease; }
+        @keyframes pulseNew { 0%{background:rgba(6,182,212,0.3)} 100%{background:transparent} }
+        .counter-bump { animation: bump 0.3s ease; }
+        @keyframes bump { 0%{transform:scale(1)} 50%{transform:scale(1.3)} 100%{transform:scale(1)} }
     </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen p-4 md:p-8 flex flex-col justify-between">
@@ -27,10 +31,26 @@
         <section class="bg-gray-900 border border-gray-800 p-6 rounded-2xl shadow-xl flex flex-col gap-4">
             <h2 class="text-lg font-bold text-cyan-400 border-b border-gray-800 pb-2">📋 1. ตั้งค่าและเปิดระบบเช็คชื่อ</h2>
 
+            <!-- วิชาที่ใช้บ่อย -->
             <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">ชื่อรายวิชา</label>
-                <input type="text" id="subject-name" value="CPE-101 Anti-Cheat Programming"
-                    class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500">
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">วิชาที่ใช้บ่อย</label>
+                <div class="flex gap-2 flex-wrap" id="saved-subjects">
+                    <span class="text-xs text-gray-600 font-mono">— ยังไม่มีวิชาที่บันทึก —</span>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <div class="flex-1">
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">ชื่อรายวิชา</label>
+                    <input type="text" id="subject-name" value="CPE-101 Anti-Cheat Programming"
+                        class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="saveSubject()" title="บันทึกวิชานี้"
+                        class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-cyan-400 px-3 py-2.5 rounded-xl text-sm transition">
+                        💾
+                    </button>
+                </div>
             </div>
 
             <div>
@@ -50,7 +70,7 @@
                 </div>
             </div>
 
-            <!-- ปักหมุดพิกัด -->
+            <!-- ปักหมุด -->
             <div class="bg-gray-950 p-4 rounded-xl border border-gray-800">
                 <span class="block text-xs font-semibold text-gray-400 uppercase mb-2">พิกัดอ้างอิงห้องเรียน</span>
                 <button onclick="pinClassroom()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition">
@@ -61,62 +81,79 @@
                 </div>
             </div>
 
-            <!-- Radius control -->
+            <!-- Radius -->
             <div class="bg-gray-950 p-4 rounded-xl border border-gray-800">
-                <span class="text-xs font-semibold text-gray-400 uppercase block mb-3">รัศมีห้องเรียน (ระยะสูงสุดที่ยอมรับ)</span>
+                <span class="text-xs font-semibold text-gray-400 uppercase block mb-3">รัศมีห้องเรียน</span>
                 <div class="flex items-center gap-3 mb-2">
                     <input type="number" id="radius-input" min="0.01" max="5" step="0.05" value="0.10"
                         class="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm font-mono text-center focus:outline-none focus:border-cyan-500"
                         oninput="syncFromInput()">
                     <span class="text-gray-400 text-sm shrink-0">กม.</span>
                     <input type="range" id="radius-slider" min="0.01" max="5" step="0.05" value="0.10"
-                        class="flex-1 accent-cyan-500 cursor-pointer"
-                        oninput="syncFromSlider()">
+                        class="flex-1 accent-cyan-500 cursor-pointer" oninput="syncFromSlider()">
                 </div>
                 <div class="flex justify-between text-[10px] text-gray-600 font-mono mb-3">
                     <span>0.01 กม.</span>
                     <span id="radius-meters" class="text-cyan-500/70">= 100 เมตร</span>
                     <span>5.00 กม.</span>
                 </div>
-                <div id="map-placeholder" class="flex items-center justify-center rounded-xl border border-gray-800 text-gray-600 text-xs font-mono" style="height:220px">
+                <div id="map-placeholder" class="flex items-center justify-center rounded-xl border border-gray-800 text-gray-600 text-xs font-mono" style="height:200px">
                     📍 กดปักหมุดพิกัดห้องเรียนก่อนเพื่อดูแผนที่
                 </div>
-                <div id="radius-map" style="height:220px; display:none;"></div>
+                <div id="radius-map" style="height:200px; display:none;"></div>
             </div>
 
             <button id="btn-toggle" onclick="toggleSystem()"
                 class="w-full bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-4 px-6 rounded-xl text-lg uppercase tracking-wider transition-all shadow-lg mt-2">
                 🟢 เริ่มเปิดระบบเช็คชื่อ
             </button>
-            <button onclick="openDashboard()"
-                class="w-full bg-gray-800 hover:bg-gray-700 text-purple-400 border border-purple-500/30 font-bold py-2.5 px-6 rounded-xl text-sm uppercase transition-all">
-                📊 เปิดหน้า Dashboard
-            </button>
-            <button onclick="exportToExcel()"
-                class="w-full bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-cyan-500/30 font-bold py-2.5 px-6 rounded-xl text-sm uppercase transition-all">
-                📥 ส่งออกข้อมูลเป็น EXCEL
-            </button>
+
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="openDashboard()"
+                    class="bg-gray-800 hover:bg-gray-700 text-purple-400 border border-purple-500/30 font-bold py-2.5 px-4 rounded-xl text-sm uppercase transition-all">
+                    📊 Dashboard
+                </button>
+                <button onclick="exportToExcel()"
+                    class="bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-cyan-500/30 font-bold py-2.5 px-4 rounded-xl text-sm uppercase transition-all">
+                    📥 Export Excel
+                </button>
+            </div>
         </section>
 
-        <!-- ขวา: QR + ตารางรายชื่อ -->
+        <!-- ขวา: QR + realtime -->
         <section class="bg-gray-900 border border-gray-800 p-6 rounded-2xl shadow-xl flex flex-col items-center min-h-[440px] gap-4">
             <h2 class="text-lg font-bold text-cyan-400 border-b border-gray-800 pb-2 w-full text-center">📺 2. QR CODE หน้าห้องเรียน</h2>
 
-            <div class="text-center">
-                <span class="text-xs uppercase tracking-widest text-gray-400 block mb-1">เช็คชื่อแล้ว</span>
-                <div class="text-5xl font-black text-emerald-400"><span id="live-count">0</span><span class="text-xl text-gray-600"> คน</span></div>
+            <!-- Timer + Counter -->
+            <div class="w-full grid grid-cols-2 gap-3 text-center">
+                <div class="bg-gray-950 border border-gray-800 rounded-xl p-3">
+                    <p class="text-xs text-gray-500 font-mono uppercase mb-1">เปิดระบบมาแล้ว</p>
+                    <p class="text-2xl font-black text-cyan-400 font-mono" id="elapsed-time">--:--</p>
+                </div>
+                <div class="bg-gray-950 border border-gray-800 rounded-xl p-3">
+                    <p class="text-xs text-gray-500 font-mono uppercase mb-1">เช็คชื่อแล้ว</p>
+                    <p class="text-2xl font-black text-emerald-400" id="live-count">0</p>
+                    <p class="text-xs text-gray-600">คน</p>
+                </div>
             </div>
 
+            <!-- QR -->
             <div class="bg-white p-4 rounded-xl shadow-inner flex flex-col items-center">
                 <img id="qr-display" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=WAITING" class="w-48 h-48 opacity-30">
             </div>
 
-            <button id="btn-zoom" onclick="openZoom()" class="hidden bg-gray-800 hover:bg-gray-700 text-xs px-4 py-2 rounded-lg border border-gray-700 text-gray-300 transition-all">
-                🔍 ขยาย QR Code เต็มหน้าจอ
-            </button>
+            <div class="flex gap-2 w-full">
+                <button id="btn-zoom" onclick="openZoom()" class="hidden flex-1 bg-gray-800 hover:bg-gray-700 text-xs px-4 py-2 rounded-lg border border-gray-700 text-gray-300 transition-all">
+                    🔍 ขยาย QR
+                </button>
+                <button id="btn-copy-url" onclick="copyStudentUrl()" class="hidden flex-1 bg-gray-800 hover:bg-gray-700 text-xs px-4 py-2 rounded-lg border border-cyan-500/30 text-cyan-400 transition-all">
+                    📋 Copy ลิงก์
+                </button>
+            </div>
+
             <p class="text-xs text-center text-gray-500" id="system-status-msg">กรุณาปักหมุดและกดเปิดระบบเพื่อสร้างรหัส QR</p>
 
-            <!-- ตารางรายชื่อ realtime -->
+            <!-- ตารางรายชื่อ -->
             <div class="w-full rounded-xl border border-gray-800 overflow-hidden" id="attendance-table-wrap" style="display:none">
                 <div class="px-4 py-2 bg-gray-950 flex justify-between items-center">
                     <span class="text-xs text-cyan-400 font-mono uppercase">รายชื่อผู้เข้าเรียน</span>
@@ -126,11 +163,11 @@
                     <table class="w-full text-xs">
                         <thead class="bg-gray-950 sticky top-0">
                             <tr>
-                                <th class="text-left px-3 py-2 text-gray-500 font-mono text-xs">#</th>
-                                <th class="text-left px-3 py-2 text-gray-500 font-mono text-xs">รหัส</th>
-                                <th class="text-left px-3 py-2 text-gray-500 font-mono text-xs">ชื่อ</th>
-                                <th class="text-left px-3 py-2 text-gray-500 font-mono text-xs">เวลา</th>
-                                <th class="text-right px-3 py-2 text-gray-500 font-mono text-xs">ระยะ</th>
+                                <th class="text-left px-3 py-2 text-gray-500 font-mono">#</th>
+                                <th class="text-left px-3 py-2 text-gray-500 font-mono">รหัส</th>
+                                <th class="text-left px-3 py-2 text-gray-500 font-mono">ชื่อ</th>
+                                <th class="text-left px-3 py-2 text-gray-500 font-mono">เวลา</th>
+                                <th class="text-right px-3 py-2 text-gray-500 font-mono">ระยะ</th>
                             </tr>
                         </thead>
                         <tbody id="attendance-tbody"></tbody>
@@ -144,18 +181,37 @@
     <div id="zoom-modal" class="hidden fixed inset-0 bg-gray-950/95 flex flex-col items-center justify-center p-4 z-[1000]">
         <button onclick="closeZoom()" class="absolute top-6 right-6 text-gray-400 hover:text-white text-4xl font-bold">&times;</button>
         <h2 class="text-2xl md:text-3xl font-bold text-cyan-400 mb-2 text-center" id="zoom-subject">วิชา</h2>
-        <p class="text-gray-400 mb-6 text-sm md:text-base text-center">ให้นักศึกษายกมือถือขึ้นมาสแกนเพื่อเข้าสู่หน้าเช็คชื่อจริง</p>
+        <p class="text-gray-400 mb-6 text-sm text-center">ให้นักศึกษายกมือถือขึ้นมาสแกนเพื่อเข้าสู่หน้าเช็คชื่อจริง</p>
         <div class="bg-white p-6 rounded-3xl shadow-2xl">
             <img id="qr-zoom-display" src="" class="w-72 h-72 md:w-[450px] md:h-[450px]">
         </div>
     </div>
 
+    <!-- Notification sound -->
+    <audio id="notify-sound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJiVkHBYT2uSjYZqUkxnioGAZE9Lao2GgGlYVXCNhH5oWlh1jomBa19ccI+KhW5lY3WRjIZzaml4kY6KenBuf5WSjn92c4CVkYt/eHmGl5ONg3x8iZiTjYN9f4uZlI2EfoCMmpWOhX+BjZqVjoWAgI6bl46GgIGPm5aOhoGCkJuXjoaBg5GbmI+GgYOSmpmQhoKElJqakIeChJSampCIgoWVmpqQiIKGlpqakIiCh5eampCJgoiYmpqQiYKJmZqakImCiZqampCJgomampqRiYKKm5qakYmCi5yamZGJgoubmpmRiYKMm5mZkYmCjZuZmZGJgo6bmZmRiYKPm5mZkYiCj5uYmZGIgo+bmJiQiIKPm5iYkIiCj5uYmJCHgo+bmJiQh4KPm5iYkIeCj5uXl4+Hgo+bl5ePhoKPm5eXj4aCj5uXl4+GgY+bl5ePhYGPm5eXj4WBj5uWl46FgY+bl5aOhYGPm5aWjoWBj5uWlo6EgY+blpaOhIGPm5WWjoSBj5uVlY2EgY+blZWNg4GPm5WVjYOBj5uVlY2DgY+blJSMg4GPm5SUjIOBj5uUlIyDgY+bk5SMgoGOm5OTjIKBjpuTk4yCgY6bk5OMgoGOm5KSi4KBjpuSkouCgY6bkpKLgYGOm5GRi4GBjpuRkYuBgY6bkZGKgYGOm5CQioGBjpuQkIqAgY6bkJCKgICOm5CQin+AjpuPj4p/gI6bj4+Jf4COm4+PiX+AjpuPj4l/gI6bj4+Jf4COm46OiX+AjpuOjol/gI6bjo6If4COm46OiH+AjZuOjoiAgI2bjoqIgAA=" type="audio/wav">
+    </audio>
+
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzosyFxVtQLJeRQeHKoQpdBr24QCHEmDEp0T42PaxGPrCur-1hrxup4OJiMLooIl2ti/exec";
 
-        // ---- Session restore: กันหายตอน refresh ----
-        const SS = sessionStorage;
+        document.getElementById('setup-date').valueAsDate = new Date();
+        document.getElementById('setup-time').value = new Date().toTimeString().substring(0, 5);
 
+        let classroomLocation = null;
+        let isSystemOpen      = false;
+        let leafletMap        = null;
+        let leafletCircle     = null;
+        let pollInterval      = null;
+        let timerInterval     = null;
+        let systemOpenTime    = null;
+        let currentSubject    = "";
+        let currentDate       = "";
+        let studentUrl        = "";
+        let prevCount         = 0;
+
+        // ── Session restore ──
+        const SS = sessionStorage;
         function saveSession() {
             SS.setItem('subject',  document.getElementById('subject-name').value);
             SS.setItem('teacher',  document.getElementById('teacher-name').value);
@@ -164,153 +220,185 @@
             SS.setItem('radius',   document.getElementById('radius-input').value);
             if (classroomLocation) SS.setItem('location', JSON.stringify(classroomLocation));
         }
-
-        function restoreSession() {
-            if (SS.getItem('subject')) document.getElementById('subject-name').value = SS.getItem('subject');
-            if (SS.getItem('teacher')) document.getElementById('teacher-name').value = SS.getItem('teacher');
-            if (SS.getItem('radius')) {
-                const r = SS.getItem('radius');
-                document.getElementById('radius-input').value  = r;
-                document.getElementById('radius-slider').value = r;
-                document.getElementById('radius-meters').innerText = '= ' + Math.round(parseFloat(r)*1000) + ' เมตร';
-            }
-            if (SS.getItem('location')) {
-                classroomLocation = JSON.parse(SS.getItem('location'));
-                document.getElementById('classroom-coords').innerText =
-                    'ล็อกตำแหน่งแล้ว! Lat: ' + classroomLocation.lat.toFixed(5) + ' | Lon: ' + classroomLocation.lon.toFixed(5);
-                document.getElementById('classroom-coords').className = "text-[11px] text-emerald-400 mt-2 font-mono text-center";
-                initMap(classroomLocation.lat, classroomLocation.lon);
-            }
-        }
-
-        // บันทึกอัตโนมัติทุกครั้งที่ page ถูก unload (refresh/ปิด tab)
         window.addEventListener('beforeunload', saveSession);
-
-        // ตั้งค่า default วันที่/เวลา
-        document.getElementById('setup-date').valueAsDate = new Date();
-        document.getElementById('setup-time').value = new Date().toTimeString().substring(0, 5);
-
-        let classroomLocation = null;
-        let isSystemOpen = false;
-        let leafletMap = null;
-        let leafletCircle = null;
-        let pollInterval = null;
-        let currentSubject = "";
-        let currentDate = "";
-
-        // restore หลัง declare ตัวแปรทั้งหมด
-        // override date/time จาก session ถ้ามี (ต้องทำหลัง valueAsDate)
-        if (SS.getItem('date')) document.getElementById('setup-date').value = SS.getItem('date');
-        if (SS.getItem('time')) document.getElementById('setup-time').value = SS.getItem('time');
-        restoreSession();
-
-        // ---- Radius sync ----
-        function getRadiusMeters() {
-            const km = parseFloat(document.getElementById('radius-input').value) || 0.1;
-            return Math.round(Math.min(5, Math.max(0.01, km)) * 1000);
+        if (SS.getItem('subject')) document.getElementById('subject-name').value = SS.getItem('subject');
+        if (SS.getItem('teacher')) document.getElementById('teacher-name').value = SS.getItem('teacher');
+        if (SS.getItem('date'))    document.getElementById('setup-date').value   = SS.getItem('date');
+        if (SS.getItem('time'))    document.getElementById('setup-time').value   = SS.getItem('time');
+        if (SS.getItem('radius')) {
+            const r = SS.getItem('radius');
+            document.getElementById('radius-input').value  = r;
+            document.getElementById('radius-slider').value = r;
+            document.getElementById('radius-meters').innerText = '= ' + Math.round(parseFloat(r)*1000) + ' เมตร';
+        }
+        if (SS.getItem('location')) {
+            classroomLocation = JSON.parse(SS.getItem('location'));
+            document.getElementById('classroom-coords').innerText =
+                'ล็อกตำแหน่งแล้ว! Lat: ' + classroomLocation.lat.toFixed(5) + ' | Lon: ' + classroomLocation.lon.toFixed(5);
+            document.getElementById('classroom-coords').className = "text-[11px] text-emerald-400 mt-2 font-mono text-center";
+            initMap(classroomLocation.lat, classroomLocation.lon);
         }
 
+        // ── Saved subjects ──
+        function loadSavedSubjects() {
+            const saved = JSON.parse(localStorage.getItem('saved_subjects') || '[]');
+            const wrap  = document.getElementById('saved-subjects');
+            if (saved.length === 0) return;
+            wrap.innerHTML = saved.map(s => `
+                <button onclick="useSubject('${s.replace(/'/g,"\\'")}') "
+                    class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 text-cyan-300 px-3 py-1 rounded-lg transition">
+                    ${s}
+                </button>`).join('');
+        }
+        function saveSubject() {
+            const sub   = document.getElementById('subject-name').value.trim();
+            if (!sub) return;
+            const saved = JSON.parse(localStorage.getItem('saved_subjects') || '[]');
+            if (!saved.includes(sub)) {
+                saved.unshift(sub);
+                localStorage.setItem('saved_subjects', JSON.stringify(saved.slice(0, 5)));
+                loadSavedSubjects();
+            }
+        }
+        function useSubject(name) {
+            document.getElementById('subject-name').value = name;
+        }
+        loadSavedSubjects();
+
+        // ── Radius ──
+        function getRadiusMeters() {
+            return Math.round(Math.min(5, Math.max(0.01, parseFloat(document.getElementById('radius-input').value)||0.1)) * 1000);
+        }
         function syncFromSlider() {
             const val = parseFloat(document.getElementById('radius-slider').value);
             document.getElementById('radius-input').value = val.toFixed(2);
-            document.getElementById('radius-meters').innerText = '= ' + Math.round(val * 1000) + ' เมตร';
+            document.getElementById('radius-meters').innerText = '= ' + Math.round(val*1000) + ' เมตร';
             updateCircle();
         }
-
         function syncFromInput() {
             let val = parseFloat(document.getElementById('radius-input').value);
             if (isNaN(val)) return;
             val = Math.min(5, Math.max(0.01, val));
             document.getElementById('radius-slider').value = val;
-            document.getElementById('radius-meters').innerText = '= ' + Math.round(val * 1000) + ' เมตร';
+            document.getElementById('radius-meters').innerText = '= ' + Math.round(val*1000) + ' เมตร';
             updateCircle();
         }
 
-        // ---- Map ----
+        // ── Map ──
         function updateCircle() {
             if (!leafletMap || !leafletCircle) return;
             leafletCircle.setRadius(getRadiusMeters());
-            leafletMap.fitBounds(leafletCircle.getBounds(), { padding: [24, 24] });
+            leafletMap.fitBounds(leafletCircle.getBounds(), { padding:[24,24] });
         }
-
         function initMap(lat, lon) {
             document.getElementById('map-placeholder').style.display = 'none';
             const mapEl = document.getElementById('radius-map');
             mapEl.style.display = 'block';
             if (leafletMap) { leafletMap.remove(); leafletMap = null; leafletCircle = null; }
-            leafletMap = L.map('radius-map', { zoomControl: true, attributionControl: false }).setView([lat, lon], 16);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(leafletMap);
+            leafletMap = L.map('radius-map', { zoomControl:true, attributionControl:false }).setView([lat, lon], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(leafletMap);
             const pinIcon = L.divIcon({
                 html: '<div style="width:14px;height:14px;background:#06b6d4;border:3px solid white;border-radius:50%;box-shadow:0 0 8px rgba(6,182,212,0.8)"></div>',
-                iconSize: [14, 14], iconAnchor: [7, 7], className: ''
+                iconSize:[14,14], iconAnchor:[7,7], className:''
             });
-            L.marker([lat, lon], { icon: pinIcon }).addTo(leafletMap);
+            L.marker([lat, lon], { icon:pinIcon }).addTo(leafletMap);
             leafletCircle = L.circle([lat, lon], {
-                radius: getRadiusMeters(), color: '#06b6d4', fillColor: '#06b6d4',
-                fillOpacity: 0.15, weight: 2, dashArray: '6 4'
+                radius: getRadiusMeters(), color:'#06b6d4', fillColor:'#06b6d4',
+                fillOpacity:0.15, weight:2, dashArray:'6 4'
             }).addTo(leafletMap);
-            leafletMap.fitBounds(leafletCircle.getBounds(), { padding: [24, 24] });
+            leafletMap.fitBounds(leafletCircle.getBounds(), { padding:[24,24] });
         }
-
         function pinClassroom() {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    classroomLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
+                navigator.geolocation.getCurrentPosition(function(pos) {
+                    classroomLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
                     document.getElementById('classroom-coords').innerText =
                         'ล็อกตำแหน่งแล้ว! Lat: ' + classroomLocation.lat.toFixed(5) + ' | Lon: ' + classroomLocation.lon.toFixed(5);
                     document.getElementById('classroom-coords').className = "text-[11px] text-emerald-400 mt-2 font-mono text-center";
                     initMap(classroomLocation.lat, classroomLocation.lon);
-                }, function() { alert("กรุณาเปิด GPS บนอุปกรณ์ก่อนครับ"); }, { enableHighAccuracy: true });
+                }, function() { alert("กรุณาเปิด GPS บนอุปกรณ์ก่อนครับ"); }, { enableHighAccuracy:true });
             }
         }
 
-        // ---- Normalize helpers (เหมือน dashboard) ----
+        // ── Timer ──
+        function startTimer() {
+            systemOpenTime = Date.now();
+            timerInterval  = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - systemOpenTime) / 1000);
+                const m = String(Math.floor(elapsed/60)).padStart(2,'0');
+                const s = String(elapsed%60).padStart(2,'0');
+                document.getElementById('elapsed-time').innerText = m + ':' + s;
+            }, 1000);
+        }
+        function stopTimer() {
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+            document.getElementById('elapsed-time').innerText = '--:--';
+        }
+
+        // ── Notification ──
+        function playNotify() {
+            try { document.getElementById('notify-sound').play(); } catch(e) {}
+            if (navigator.vibrate) navigator.vibrate(100);
+        }
+
+        // ── Normalize helpers ──
         function normDate(val) {
             if (!val) return "";
-            if (val instanceof Date) return val.toISOString().split("T")[0];
             const s = String(val).trim();
-            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-                const [d, m, y] = s.split("/");
-                return y + "-" + m.padStart(2,"0") + "-" + d.padStart(2,"0");
+            if (s.startsWith('Fri')||s.startsWith('Mon')||s.startsWith('Tue')||
+                s.startsWith('Wed')||s.startsWith('Thu')||s.startsWith('Sat')||s.startsWith('Sun')) {
+                try {
+                    const d = new Date(s);
+                    const bkk = new Date(d.getTime() + 7*60*60*1000);
+                    return bkk.toISOString().substring(0,10);
+                } catch(e) {}
             }
-            const p = new Date(s);
-            return isNaN(p) ? s : p.toISOString().split("T")[0];
+            if (s.includes('T') && s.endsWith('Z')) {
+                const d = new Date(s);
+                return new Date(d.getTime()+7*60*60*1000).toISOString().substring(0,10);
+            }
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+            return s;
         }
-
-        function extractTime(val) {
+        function normTime(val) {
             if (!val) return "—";
             const m = String(val).match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
-            return m ? m[1].padStart(2,"0") + ":" + m[2] + " น." : "—";
+            return m ? m[1].padStart(2,'0')+':'+m[2]+' น.' : "—";
         }
 
-        // ---- Polling attendance ----
+        // ── Polling ──
         async function fetchAttendance() {
             try {
                 const res  = await fetch(APPS_SCRIPT_URL + '?t=' + Date.now());
                 const json = await res.json();
                 if (json.status !== "ok") return;
-
-                // normalize date ทุกแถวก่อน filter
                 const filtered = json.data
                     .map(r => ({ ...r, date: normDate(r.date) }))
                     .filter(r => r.subject === currentSubject && r.date === currentDate);
 
-                // อัปเดตตัวนับ
-                document.getElementById('live-count').innerText = filtered.length;
-                document.getElementById('last-refresh').innerText =
-                    "อัปเดต: " + new Date().toTimeString().substring(0, 8);
+                const count = filtered.length;
+                const liveCountEl = document.getElementById('live-count');
 
-                // แสดงตาราง
-                if (filtered.length > 0) {
+                // แจ้งเตือนเมื่อมีคนใหม่
+                if (count > prevCount && prevCount >= 0) {
+                    playNotify();
+                    liveCountEl.classList.remove('counter-bump');
+                    void liveCountEl.offsetWidth;
+                    liveCountEl.classList.add('counter-bump');
+                }
+                prevCount = count;
+                liveCountEl.innerText = count;
+                document.getElementById('last-refresh').innerText = "อัปเดต: " + new Date().toTimeString().substring(0,8);
+
+                if (count > 0) {
                     document.getElementById('attendance-table-wrap').style.display = 'block';
                     document.getElementById('attendance-tbody').innerHTML = filtered.map((r, i) => `
-                        <tr class="border-t border-gray-800 hover:bg-gray-800/50">
+                        <tr class="border-t border-gray-800 hover:bg-gray-800/50 transition">
                             <td class="px-3 py-2 text-gray-500">${i+1}</td>
-                            <td class="px-3 py-2 font-mono text-gray-300 text-xs">${r.studentId || '—'}</td>
-                            <td class="px-3 py-2 text-white">${r.studentName || '—'}</td>
-                            <td class="px-3 py-2 text-gray-400 text-xs font-mono">${extractTime(r.timestamp)}</td>
-                            <td class="px-3 py-2 text-cyan-400 text-right font-mono">${r.distance || '—'}ม.</td>
+                            <td class="px-3 py-2 font-mono text-gray-300 text-xs">${r.studentId||'—'}</td>
+                            <td class="px-3 py-2 text-white">${r.studentName||'—'}</td>
+                            <td class="px-3 py-2 text-gray-400 text-xs">${normTime(r.timestamp)}</td>
+                            <td class="px-3 py-2 text-cyan-400 text-right font-mono">${r.distance||'—'}ม.</td>
                         </tr>`).join('');
                 }
             } catch(err) {
@@ -321,81 +409,98 @@
         function startPolling(subject, date) {
             currentSubject = subject;
             currentDate    = date;
-            fetchAttendance(); // ดึงทันที
+            prevCount      = 0;
+            fetchAttendance();
             if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(fetchAttendance, 5000); // ทุก 5 วิ
+            pollInterval = setInterval(fetchAttendance, 5000);
         }
-
         function stopPolling() {
             if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
             document.getElementById('live-count').innerText = "0";
             document.getElementById('attendance-table-wrap').style.display = 'none';
             document.getElementById('last-refresh').innerText = "-";
+            prevCount = 0;
         }
 
-        // ---- Toggle system ----
+        // ── Toggle ──
         function toggleSystem() {
             if (!classroomLocation) { alert("อาจารย์ลืมกดปุ่ม 'ปักหมุดพิกัดห้องเรียน' ครับ!"); return; }
             const btn     = document.getElementById('btn-toggle');
             const qrImg   = document.getElementById('qr-display');
             const btnZoom = document.getElementById('btn-zoom');
+            const btnCopy = document.getElementById('btn-copy-url');
             isSystemOpen  = !isSystemOpen;
 
             if (isSystemOpen) {
-                btn.innerText = "🔴 ปิดระบบเช็คชื่อ";
-                btn.className = "w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-xl text-lg uppercase tracking-wider transition-all shadow-lg mt-2";
-                const subject      = document.getElementById('subject-name').value;
-                const teacher      = document.getElementById('teacher-name').value.trim() || "ผู้สอน";
-                const date         = document.getElementById('setup-date').value;
-                const time         = document.getElementById('setup-time').value;
-                const radiusMeters = getRadiusMeters();
-                const token        = Math.random().toString(36).substring(7).toUpperCase();
-                const baseUrl      = window.location.href.split('teacher.html')[0];
-                const studentUrl   = baseUrl + 'student.html?token=' + token +
+                btn.innerText  = "🔴 ปิดระบบเช็คชื่อ";
+                btn.className  = "w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-xl text-lg uppercase tracking-wider transition-all shadow-lg mt-2";
+                const subject  = document.getElementById('subject-name').value;
+                const teacher  = document.getElementById('teacher-name').value.trim() || "ผู้สอน";
+                const date     = document.getElementById('setup-date').value;
+                const time     = document.getElementById('setup-time').value;
+                const radius   = getRadiusMeters();
+                const token    = Math.random().toString(36).substring(7).toUpperCase();
+                const baseUrl  = window.location.href.split('teacher.html')[0];
+                studentUrl     = baseUrl + 'student.html?token=' + token +
                     '&sub='     + encodeURIComponent(subject) +
                     '&teacher=' + encodeURIComponent(teacher) +
                     '&date='    + date + '&time=' + time +
                     '&tlat='    + classroomLocation.lat +
                     '&tlon='    + classroomLocation.lon +
-                    '&radius='  + radiusMeters;
+                    '&radius='  + radius;
                 qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(studentUrl);
                 qrImg.classList.remove('opacity-30');
                 btnZoom.classList.remove('hidden');
+                btnCopy.classList.remove('hidden');
                 document.getElementById('system-status-msg').innerText = "ระบบสร้างรหัสเช็คชื่อและฝังพิกัดลง QR Code สำเร็จ!";
                 startPolling(subject, date);
+                startTimer();
             } else {
-                btn.innerText = "🟢 เริ่มเปิดระบบเช็คชื่อ";
-                btn.className = "w-full bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-4 px-6 rounded-xl text-lg uppercase tracking-wider transition-all shadow-lg mt-2";
-                qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=CLOSED";
+                btn.innerText  = "🟢 เริ่มเปิดระบบเช็คชื่อ";
+                btn.className  = "w-full bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-4 px-6 rounded-xl text-lg uppercase tracking-wider transition-all shadow-lg mt-2";
+                qrImg.src      = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=CLOSED";
                 qrImg.classList.add('opacity-30');
                 btnZoom.classList.add('hidden');
+                btnCopy.classList.add('hidden');
                 closeZoom();
                 document.getElementById('system-status-msg').innerText = "ระบบปิดการเช็คชื่อเรียบร้อยแล้ว";
                 stopPolling();
+                stopTimer();
+                studentUrl = "";
             }
         }
 
-        // ---- Zoom modal ----
+        // ── Copy URL ──
+        function copyStudentUrl() {
+            if (!studentUrl) return;
+            navigator.clipboard.writeText(studentUrl).then(() => {
+                const btn = document.getElementById('btn-copy-url');
+                btn.innerText = '✓ Copy แล้ว!';
+                btn.classList.add('text-emerald-400');
+                setTimeout(() => { btn.innerText = '📋 Copy ลิงก์'; btn.classList.remove('text-emerald-400'); }, 2000);
+            }).catch(() => {
+                prompt("Copy ลิงก์นี้ได้เลยครับ:", studentUrl);
+            });
+        }
+
+        // ── Zoom ──
         function openZoom() {
-            document.getElementById('zoom-subject').innerText = document.getElementById('subject-name').value;
-            document.getElementById('qr-zoom-display').src   = document.getElementById('qr-display').src;
+            document.getElementById('zoom-subject').innerText  = document.getElementById('subject-name').value;
+            document.getElementById('qr-zoom-display').src     = document.getElementById('qr-display').src;
             document.getElementById('zoom-modal').classList.remove('hidden');
             const mapEl = document.getElementById('radius-map');
             if (mapEl) mapEl.style.visibility = 'hidden';
         }
-
         function closeZoom() {
             document.getElementById('zoom-modal').classList.add('hidden');
             const mapEl = document.getElementById('radius-map');
             if (mapEl) mapEl.style.visibility = 'visible';
         }
 
-        // ---- Dashboard & Export ----
+        // ── Dashboard & Export ──
         function openDashboard() {
-            const baseUrl = window.location.href.split('teacher.html')[0];
-            window.open(baseUrl + 'dashboard.html', '_blank');
+            window.open(window.location.href.split('teacher.html')[0] + 'dashboard.html', '_blank');
         }
-
         async function exportToExcel() {
             try {
                 const res  = await fetch(APPS_SCRIPT_URL + '?t=' + Date.now());
@@ -403,25 +508,19 @@
                 if (json.status !== "ok") throw new Error(json.message);
                 const subject = document.getElementById('subject-name').value;
                 const date    = document.getElementById('setup-date').value;
-                const data    = json.data.filter(r => r.subject === subject && r.date === date);
+                const data    = json.data.filter(r => r.subject === subject && normDate(r.date) === date);
                 if (!data.length) { alert("ยังไม่มีข้อมูลเช็คชื่อในคาบนี้ครับ"); return; }
                 const rows = data.map((r, i) => ({
-                    ลำดับ:        i + 1,
-                    รหัสนักศึกษา: r.studentId,
-                    ชื่อนามสกุล:  r.studentName,
-                    วิชา:          r.subject,
-                    ผู้สอน:        r.teacher || "—",
-                    วันที่:         r.date,
-                    เวลา:          String(r.timestamp).split(" ")[1] || r.timestamp,
-                    ระยะเมตร:      r.distance
+                    ลำดับ: i+1, รหัสนักศึกษา: r.studentId, ชื่อนามสกุล: r.studentName,
+                    วิชา: r.subject, ผู้สอน: r.teacher||'—', วันที่: r.date,
+                    เวลา: normTime(r.timestamp), ระยะเมตร: r.distance,
+                    อุปกรณ์: r.userAgent||'—', Fingerprint: r.fingerprint||'—'
                 }));
                 const ws = XLSX.utils.json_to_sheet(rows);
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "เช็คชื่อ");
                 XLSX.writeFile(wb, "attendance_" + date + ".xlsx");
-            } catch(err) {
-                alert("ดึงข้อมูลไม่ได้: " + err.message);
-            }
+            } catch(err) { alert("ดึงข้อมูลไม่ได้: " + err.message); }
         }
     </script>
 </body>

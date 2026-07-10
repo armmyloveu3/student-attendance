@@ -14,7 +14,6 @@
         <h1 class="text-2xl font-bold mt-3" id="std-subject-title">กำลังโหลด...</h1>
     </div>
 
-    <!-- Info card: วิชา / ผู้สอน / เวลา -->
     <div class="max-w-sm w-full mx-auto mt-4">
         <div class="grid grid-cols-3 gap-2 text-center">
             <div class="bg-gray-900 border border-gray-800 rounded-xl p-3">
@@ -30,6 +29,12 @@
                 <p class="text-sm font-bold text-emerald-400 truncate" id="info-teacher">-</p>
             </div>
         </div>
+    </div>
+
+    <!-- Banner เตือนถ้าเคยลงชื่อในคาบนี้แล้ว -->
+    <div id="device-banner" class="hidden max-w-sm w-full mx-auto mt-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-4 py-3 text-center">
+        <p class="text-yellow-400 text-sm font-bold mb-1">📱 ระบบได้บันทึกอุปกรณ์นี้ไว้แล้ว</p>
+        <p class="text-yellow-300/70 text-xs">อย่าลงชื่อแทนกันนะจ๊ะ 😊</p>
     </div>
 
     <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700 max-w-sm w-full mx-auto my-4">
@@ -48,22 +53,73 @@
                 class="w-full bg-cyan-500 hover:bg-cyan-600 text-gray-950 font-bold py-4 px-6 rounded-xl text-lg uppercase tracking-wider transition-all shadow-lg mt-2">
                 📍 แชร์ GPS และส่งชื่อเข้าเรียน
             </button>
+            <p class="text-center text-[11px] text-yellow-500/70 font-mono">
+                📱 ระบบบันทึกอุปกรณ์ทุกครั้งที่ส่งชื่อ
+            </p>
         </div>
 
         <div id="status-section" class="hidden text-center py-4">
             <div id="status-icon" class="text-5xl mb-2"></div>
             <h2 id="status-title" class="text-xl font-bold mb-1"></h2>
-            <p id="status-desc" class="text-xs text-gray-400"></p>
+            <p id="status-desc" class="text-xs text-gray-400 whitespace-pre-line"></p>
         </div>
     </div>
 
-    <div class="text-center text-[10px] text-gray-600 font-mono mb-1">ANTI-CHEAT GPS SECURITY // BY J.A.R.V.I.S.</div>
-    <div class="text-center text-[11px] text-gray-500 mb-4">หากเกิดข้อผิดพลาด กรุณาแจ้งอาจารย์โดยตรงหลังคาบครับ</div>
+    <div class="text-center text-[10px] text-gray-600 font-mono mb-1">ระบบมาเข้าเรียนซะดี ๆ // BY NongArmNarak</div>
+    <div class="text-center text-[11px] text-gray-500 mb-4">หากเกิดข้อผิดพลาด กรุณาแจ้งพี่อาร์มครับ</div>
 
     <script>
-        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxNHjhWhr6gnpDgLckTAebA9EPpGuSCh74g1NjmD0Xx07Nd-_qFPpfAoA9GYmZ0OnKL/exec";
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzosyFxVtQLJeRQeHKoQpdBr24QCHEmDEp0T42PaxGPrCur-1hrxup4OJiMLooIl2ti/exec";
 
-        const urlParams = new URLSearchParams(window.location.search);
+        // ── Device info ──
+        function getDeviceInfo() {
+            const ua = navigator.userAgent;
+            let os = /iPhone|iPad/.test(ua)?'iOS':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac/.test(ua)?'macOS':'Other';
+            let br = /CriOS/.test(ua)?'Chrome/iOS':/Chrome/.test(ua)?'Chrome':/Safari/.test(ua)?'Safari':/Firefox/.test(ua)?'Firefox':'Other';
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.font = '14px Arial';
+            ctx.fillText('fp', 2, 2);
+            const cp = canvas.toDataURL().slice(-20);
+            const raw = [ua, screen.width+'x'+screen.height, screen.colorDepth,
+                         new Date().getTimezoneOffset(), navigator.hardwareConcurrency||0,
+                         navigator.language, cp].join('|');
+            let hash = 0;
+            for (let i = 0; i < raw.length; i++) { hash = ((hash<<5)-hash)+raw.charCodeAt(i); hash|=0; }
+            return {
+                userAgent:   os + ' / ' + br,
+                screenSize:  screen.width + 'x' + screen.height,
+                fingerprint: 'FP_' + Math.abs(hash).toString(36).toUpperCase()
+            };
+        }
+
+        // ── Device Lock ──
+        function getLockKey() {
+            const t = new URLSearchParams(window.location.search).get('token') || 'unknown';
+            return 'devlock_' + t;
+        }
+
+        function getDeviceLock() {
+            try { return JSON.parse(localStorage.getItem(getLockKey())); } catch(e) { return null; }
+        }
+
+        function saveDeviceLock(studentId, studentName) {
+            try {
+                localStorage.setItem(getLockKey(), JSON.stringify({
+                    studentId, studentName, at: new Date().toISOString()
+                }));
+            } catch(e) {}
+        }
+
+        // แสดง banner ถ้าเคยลงชื่อแล้ว (ไม่บล็อก)
+        window.addEventListener('DOMContentLoaded', function() {
+            if (getDeviceLock()) {
+                document.getElementById('device-banner').classList.remove('hidden');
+            }
+        });
+
+        // ── URL params ──
+        const urlParams      = new URLSearchParams(window.location.search);
         const currentSubject = urlParams.get('sub') || "ไม่พบข้อมูลรายวิชา";
         const teacherName    = urlParams.get('teacher') ? decodeURIComponent(urlParams.get('teacher')) : "ไม่ระบุ";
         const setupDate      = urlParams.get('date') || "-";
@@ -73,22 +129,19 @@
         const tokenFromUrl   = urlParams.get('token');
         const allowedRadius  = parseInt(urlParams.get('radius')) || 100;
 
-        // แสดงข้อมูลคาบเรียน
         document.getElementById('std-subject-title').innerText = decodeURIComponent(currentSubject);
         document.getElementById('info-teacher').innerText = teacherName;
-        document.getElementById('info-time').innerText = setupTime;
+        document.getElementById('info-time').innerText    = setupTime;
 
-        // แปลง date เป็นรูปแบบไทย
         if (setupDate && setupDate !== "-") {
             const d = new Date(setupDate);
-            document.getElementById('info-date').innerText = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+            document.getElementById('info-date').innerText = d.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371000;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+            const dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
@@ -107,19 +160,15 @@
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(function(position) {
-                    const distance      = calculateDistance(teacherLat, teacherLon, position.coords.latitude, position.coords.longitude);
-                    const roundedDistance = Math.round(distance);
-
-                    if (roundedDistance <= allowedRadius) {
-                        sendToSheet(id, name, roundedDistance);
+                    const dist = Math.round(calculateDistance(teacherLat, teacherLon, position.coords.latitude, position.coords.longitude));
+                    if (dist <= allowedRadius) {
+                        sendToSheet(id, name, dist);
                     } else {
                         btn.disabled = false;
                         btn.innerText = "📍 แชร์ GPS และส่งชื่อเข้าเรียน";
-                        const radiusText = allowedRadius >= 1000
-                            ? (allowedRadius/1000).toFixed(2) + ' กม.'
-                            : allowedRadius + ' เมตร';
+                        const rt = allowedRadius >= 1000 ? (allowedRadius/1000).toFixed(2)+' กม.' : allowedRadius+' เมตร';
                         showStatus("failed", "❌ พิกัดอยู่นอกพื้นที่ห้องเรียน",
-                            `คุณอยู่ห่างจากห้องเรียน ${roundedDistance} เมตร (รัศมีที่กำหนด: ${radiusText})`);
+                            "คุณอยู่ห่างจากห้องเรียน " + dist + " เมตร (รัศมีที่กำหนด: " + rt + ")");
                     }
                 }, function() {
                     btn.disabled = false;
@@ -133,38 +182,50 @@
             const btn = document.querySelector('button[onclick="submitAttendance()"]');
             btn.innerText = "📡 กำลังบันทึกข้อมูล...";
 
-            const payload = {
+            const device = getDeviceInfo();
+            const payload = JSON.stringify({
                 studentId,
                 studentName,
-                subject:  decodeURIComponent(currentSubject),
-                teacher:  teacherName,
-                date:     setupDate,
-                distance
-            };
+                subject:     decodeURIComponent(currentSubject),
+                teacher:     teacherName,
+                date:        setupDate,
+                distance,
+                userAgent:   device.userAgent,
+                screenSize:  device.screenSize,
+                fingerprint: device.fingerprint
+            });
+
+            const url = APPS_SCRIPT_URL +
+                '?ua=' + encodeURIComponent(device.userAgent) +
+                '&sc=' + encodeURIComponent(device.screenSize) +
+                '&fp=' + encodeURIComponent(device.fingerprint);
 
             try {
-                await fetch(APPS_SCRIPT_URL, {
-                    method: "POST",
-                    mode:   "no-cors",
+                await fetch(url, {
+                    method:  "POST",
+                    mode:    "no-cors",
                     headers: { "Content-Type": "text/plain" },
-                    body:   JSON.stringify(payload)
+                    body:    payload
                 });
+                saveDeviceLock(studentId, studentName);
+                document.getElementById('device-banner').classList.remove('hidden');
                 showStatus("success", "✅ บันทึกข้อมูลสำเร็จ!",
-                    `ระบบบันทึกชื่อเข้า Google Sheets แล้ว (ห่างจากอาจารย์ ${distance} เมตร)`);
+                    "ระบบบันทึกชื่อเข้า Google Sheets แล้ว (ห่างจากอาจารย์ " + distance + " เมตร)");
             } catch(err) {
+                const btn2 = document.querySelector('button[onclick="submitAttendance()"]');
+                if (btn2) { btn2.disabled = false; btn2.innerText = "📍 แชร์ GPS และส่งชื่อเข้าเรียน"; }
                 showStatus("failed", "❌ เกิดข้อผิดพลาด",
-                    "ไม่สามารถส่งข้อมูลได้ กรุณาแจ้งอาจารย์ครับ (" + err.message + ")");
+                    "ไม่สามารถส่งข้อมูลได้ กรุณาแจ้งพี่อาร์มครับ (" + err.message + ")");
             }
         }
 
         function showStatus(type, title, desc) {
             document.getElementById('form-section').classList.add('hidden');
-            const section = document.getElementById('status-section');
-            section.classList.remove('hidden');
-            document.getElementById('status-icon').innerText = type === "success" ? "✅" : "❌";
-            document.getElementById('status-title').className = type === "success"
-                ? "text-xl font-bold text-emerald-400 mb-1"
-                : "text-xl font-bold text-red-500 mb-1";
+            document.getElementById('status-section').classList.remove('hidden');
+            const icons  = { success:"✅", failed:"❌" };
+            const colors = { success:"text-emerald-400", failed:"text-red-500" };
+            document.getElementById('status-icon').innerText  = icons[type]  || "❌";
+            document.getElementById('status-title').className = "text-xl font-bold mb-1 " + (colors[type] || "text-red-500");
             document.getElementById('status-title').innerText = title;
             document.getElementById('status-desc').innerText  = desc;
         }

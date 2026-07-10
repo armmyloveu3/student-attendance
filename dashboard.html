@@ -65,16 +65,21 @@
         </button>
     </div>
 
-    <!-- Metric cards: แค่ 2 ใบ -->
-    <div class="grid grid-cols-2 gap-4 mb-6">
+    <!-- Metric cards -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
         <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
             <p class="text-xs text-gray-500 uppercase font-mono mb-2">เช็คชื่อแล้ว</p>
             <p class="text-5xl font-black text-cyan-400" id="metric-total">—</p>
             <p class="text-xs text-gray-600 font-mono mt-1">คน</p>
         </div>
+        <div class="bg-gray-900 border border-red-900/30 rounded-2xl p-6">
+            <p class="text-xs text-gray-500 uppercase font-mono mb-2">น่าสงสัย</p>
+            <p class="text-5xl font-black text-red-400" id="metric-suspect">0</p>
+            <p class="text-xs text-gray-600 font-mono mt-1">รายการ</p>
+        </div>
         <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
             <p class="text-xs text-gray-500 uppercase font-mono mb-2">คนล่าสุด</p>
-            <p class="text-xl font-bold text-purple-400 leading-tight" id="metric-latest">—</p>
+            <p class="text-base font-bold text-purple-400 leading-tight" id="metric-latest">—</p>
             <p class="text-xs text-gray-600 font-mono mt-1" id="metric-latest-time">-</p>
         </div>
     </div>
@@ -126,6 +131,7 @@
                         <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">เวลา</th>
                         <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">อุปกรณ์</th>
                         <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">Fingerprint</th>
+                        <th class="text-left px-4 py-3 text-gray-500 font-mono text-xs">สถานะ</th>
                         <th class="text-right px-4 py-3 text-gray-500 font-mono text-xs">ระยะ (ม.)</th>
                     </tr>
                 </thead>
@@ -293,6 +299,13 @@
 
         function renderMetrics(data) {
             document.getElementById('metric-total').innerText = data.length || "0";
+            // นับรายการน่าสงสัย
+            const fpCnt = {};
+            data.forEach(r => { if(r.fingerprint) fpCnt[r.fingerprint] = (fpCnt[r.fingerprint]||0)+1; });
+            const suspectCount = data.filter(r =>
+                r.fpFlag === 'fp_reused' || (r.fingerprint && fpCnt[r.fingerprint] > 1)
+            ).length;
+            document.getElementById('metric-suspect').innerText = suspectCount || "0";
             if (data.length) {
                 const last = data[data.length - 1];
                 document.getElementById('metric-latest').innerText      = last.studentName || "—";
@@ -314,28 +327,48 @@
             document.getElementById('empty-state').classList.add('hidden');
             document.getElementById('table-wrap').style.display = 'block';
             document.getElementById('table-count').innerText = data.length + " รายการ";
-            // เช็ค fingerprint ซ้ำ
+            // เช็ค fingerprint ซ้ำ หรือ fpFlag น่าสงสัย
             const fpCounts = {};
             data.forEach(r => { if(r.fingerprint) fpCounts[r.fingerprint] = (fpCounts[r.fingerprint]||0)+1; });
-            const hasDup = Object.values(fpCounts).some(v => v > 1);
-            document.getElementById('dup-warning').classList.toggle('hidden', !hasDup);
+            const hasDupFP  = Object.values(fpCounts).some(v => v > 1);
+            const hasBadFlag = data.some(r => r.fpFlag === 'fp_reused');
+            const hasSuspect = hasDupFP || hasBadFlag;
+            const dupEl = document.getElementById('dup-warning');
+            dupEl.classList.toggle('hidden', !hasSuspect);
+            if (hasBadFlag) {
+                dupEl.innerText = '🚨 พบการลงชื่อจากเครื่องเดิมในหลายชื่อ — น่าสงสัยมาก!';
+            } else if (hasDupFP) {
+                dupEl.innerText = '⚠️ พบ Fingerprint ซ้ำ — อาจลงชื่อแทนกัน';
+            }
             // นับ fingerprint ซ้ำ
             const fpCount = {};
             data.forEach(r => { if (r.fingerprint) fpCount[r.fingerprint] = (fpCount[r.fingerprint]||0)+1; });
 
+            const fpFlagLabel = {
+                'ok':         { text: '✓ ปกติ',           cls: 'text-emerald-400' },
+                'fp_reused':  { text: '🚨 เครื่องซ้ำ!',   cls: 'text-red-400 font-bold' },
+                '':           { text: '—',                 cls: 'text-gray-600' }
+            };
+
             document.getElementById('main-tbody').innerHTML = data.map((r, i) => {
-                const isDupFP = r.fingerprint && fpCount[r.fingerprint] > 1;
-                const rowClass = isDupFP ? "border-t border-red-900/50 bg-red-900/10 hover:bg-red-900/20" : "border-t border-gray-800 hover:bg-gray-800/40";
+                const isDupFP   = r.fingerprint && fpCount[r.fingerprint] > 1;
+                const isFlagBad = r.fpFlag === 'fp_reused';
+                const isSuspect = isDupFP || isFlagBad;
+                const rowClass  = isSuspect
+                    ? "border-t border-red-900/50 bg-red-900/10 hover:bg-red-900/20"
+                    : "border-t border-gray-800 hover:bg-gray-800/40";
+                const flag = fpFlagLabel[r.fpFlag] || fpFlagLabel[''];
                 return `<tr class="${rowClass} transition">
                     <td class="px-4 py-3 text-gray-600">${i+1}</td>
                     <td class="px-4 py-3 font-mono text-gray-300 text-xs">${r.studentId || "—"}</td>
-                    <td class="px-4 py-3 font-bold ${isDupFP?'text-red-400':'text-white'}">${r.studentName || "—"}${isDupFP?' ⚠️':''}</td>
+                    <td class="px-4 py-3 font-bold ${isSuspect?'text-red-400':'text-white'}">${r.studentName || "—"}${isSuspect?' ⚠️':''}</td>
                     <td class="px-4 py-3 text-gray-400 text-xs">${r.subject || "—"}</td>
                     <td class="px-4 py-3 text-purple-400 text-xs">${r.teacher || "—"}</td>
                     <td class="px-4 py-3 text-gray-400 text-xs font-mono">${formatDateTH(r.date)}</td>
                     <td class="px-4 py-3 text-gray-400 text-xs font-mono">${extractTime(r.timestamp)}</td>
                     <td class="px-4 py-3 text-gray-500 text-xs">${r.userAgent || "—"}</td>
-                    <td class="px-4 py-3 font-mono text-xs ${isDupFP?'text-red-400':'text-gray-600'}">${r.fingerprint || "—"}</td>
+                    <td class="px-4 py-3 font-mono text-xs ${isSuspect?'text-red-400':'text-gray-600'}">${r.fingerprint ? r.fingerprint.substring(0,12) : "—"}</td>
+                    <td class="px-4 py-3 text-xs ${flag.cls}">${flag.text}</td>
                     <td class="px-4 py-3 text-right text-cyan-400 font-mono">${r.distance || "—"}</td>
                 </tr>`;
             }).join('');
